@@ -7,8 +7,8 @@
 ================================================================ */
 
 // ── Credenciales del proyecto ──────────────────────────────────
-const SUPABASE_URL  = 'https://TU_PROJECT_ID.supabase.co';   // ← reemplazar
-const SUPABASE_ANON = 'TU_ANON_PUBLIC_KEY';                  // ← reemplazar
+const SUPABASE_URL  = 'https://awoxzsalguaercglrywf.supabase.co';   // ← reemplazar
+const SUPABASE_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF3b3h6c2FsZ3VhZXJjZ2xyeXdmIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODIyNDAyMjcsImV4cCI6MjA5NzgxNjIyN30.9vBd-U8-rnzEwMIOj3cJg-Q_P8TQcwe7eVsHmGs0TnY';                  // ← reemplazar
 
 // La SERVICE_ROLE KEY **NUNCA** va en el frontend.
 // Solo se usa en Edge Functions o en el backend de Supabase.
