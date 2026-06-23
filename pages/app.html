@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Fit House — Mi Perfil</title>
+  <link rel="stylesheet" href="../css/tokens.css"/>
+
+  <!-- Supabase JS v2 -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <!-- QR Code generator (qrcodejs) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <style>
+    /* ── Shell ──────────────────────────────────────────────────── */
+    body { min-height: 100vh; }
+
+    header {
+      position: sticky; top: 0; z-index: 50;
+      background: rgba(10,10,10,0.88);
+      backdrop-filter: blur(14px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px; height: 60px;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+
+    .app-shell {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 40px 24px 80px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    /* ── Loading overlay ────────────────────────────────────────── */
+    #loading-screen {
+      position: fixed; inset: 0; z-index: 200;
+      background: var(--bg);
+      display: flex; align-items: center; justify-content: center;
+      flex-direction: column; gap: 20px;
+    }
+    .loading-logo {
+      font-family: var(--font-display);
+      font-size: 48px; letter-spacing: 0.06em; color: var(--white);
+    }
+    .loading-logo span { color: var(--accent); }
+
+    /* ── PAYWALL / Pantalla de bloqueo ──────────────────────────── */
+    #paywall {
+      display: none;
+      position: fixed; inset: 0; z-index: 190;
+      background: var(--bg);
+      flex-direction: column;
+      align-items: center; justify-content: center;
+      text-align: center; padding: 40px;
+    }
+
+    .paywall-icon {
+      font-size: 72px; margin-bottom: 24px;
+      animation: pulseRed 2s ease-in-out infinite;
+    }
+    @keyframes pulseRed {
+      0%,100% { filter: drop-shadow(0 0 0px var(--red)); }
+      50%      { filter: drop-shadow(0 0 18px var(--red)); }
+    }
+
+    .paywall-headline {
+      font-family: var(--font-display);
+      font-size: clamp(36px, 8vw, 64px);
+      letter-spacing: 0.04em; line-height: 0.95;
+      color: var(--red); margin-bottom: 16px;
+    }
+
+    .paywall-sub {
+      font-size: 15px; color: var(--muted);
+      max-width: 360px; margin-bottom: 32px; line-height: 1.7;
+    }
+
+    /* ── Perfil del atleta ──────────────────────────────────────── */
+    .profile-top {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 24px; align-items: center;
+    }
+
+    .avatar {
+      width: 72px; height: 72px;
+      border-radius: 50%;
+      background: var(--surface2);
+      border: 2px solid var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-display);
+      font-size: 32px; color: var(--accent);
+    }
+
+    .profile-name {
+      font-family: var(--font-display);
+      font-size: 38px; letter-spacing: 0.04em;
+      line-height: 1; margin-bottom: 6px;
+    }
+
+    /* ── Stats row ──────────────────────────────────────────────── */
+    .stats-row {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 16px;
+    }
+    @media (max-width: 600px) { .stats-row { grid-template-columns: 1fr 1fr; } }
+
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 20px;
+    }
+
+    .stat-value {
+      font-family: var(--font-display);
+      font-size: 40px; color: var(--accent);
+      line-height: 1; margin-bottom: 4px;
+    }
+
+    .stat-label {
+      font-family: var(--font-mono);
+      font-size: 10px; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--muted);
+    }
+
+    /* ── QR Section ─────────────────────────────────────────────── */
+    .qr-section {
+      display: flex; flex-direction: column;
+      align-items: center; gap: 20px;
+    }
+
+    .qr-box {
+      background: var(--white);
+      padding: 18px; border-radius: var(--radius-lg);
+      position: relative;
+    }
+
+    /* Countdown ring around QR */
+    .qr-countdown {
+      font-family: var(--font-mono);
+      font-size: 12px; color: var(--muted);
+      letter-spacing: 0.1em;
+      display: flex; align-items: center; gap: 8px;
+    }
+
+    .countdown-bar {
+      height: 3px; width: 120px;
+      background: var(--border); border-radius: 2px;
+      overflow: hidden;
+    }
+    .countdown-fill {
+      height: 100%; background: var(--accent);
+      transition: width 1s linear;
+      border-radius: 2px;
+    }
+
+    .qr-label {
+      font-family: var(--font-mono);
+      font-size: 10px; letter-spacing: 0.16em;
+      text-transform: uppercase; color: var(--muted);
+      text-align: center;
+    }
+
+    /* ── Aforo card ─────────────────────────────────────────────── */
+    .aforo-card {
+      display: grid;
+      grid-template-columns: auto 1fr;
+      gap: 28px; align-items: center;
+    }
+    @media (max-width: 600px) { .aforo-card { grid-template-columns: 1fr; } }
+
+    .gauge-wrap { position: relative; width: 140px; height: 140px; flex-shrink: 0; }
+    .gauge-svg  { transform: rotate(-90deg); }
+    .gauge-center {
+      position: absolute; top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+    }
+    #gauge-pct {
+      font-family: var(--font-display); font-size: 38px;
+      line-height: 1; color: var(--white);
+    }
+  </style>
+</head>
+<body>
+
+  <div id="toast-container"></div>
+
+  <!-- Loading -->
+  <div id="loading-screen">
+    <div class="spinner" style="width:36px;height:36px;border-width:3px"></div>
+    <div class="loading-logo">FIT<span>.</span>HOUSE</div>
+  </div>
+
+  <!-- Paywall -->
+  <div id="paywall">
+    <div class="paywall-icon">🔒</div>
+    <h2 class="paywall-headline">SUSCRIPCIÓN<br>VENCIDA</h2>
+    <p class="paywall-sub">
+      Tu acceso al gimnasio ha expirado.<br>
+      Pasa por recepción para renovar tu mes y reactivar tu perfil.
+    </p>
+    <a href="https://wa.me/TU_NUMERO?text=Hola%20Fit%20House%2C%20necesito%20renovar%20mi%20membres%C3%ADa." target="_blank" class="btn btn-danger" style="margin-bottom:16px">
+      Contactar por WhatsApp →
+    </a>
+    <button class="btn btn-ghost btn-sm" id="logout-paywall">Cerrar sesión</button>
+  </div>
+
+  <!-- App principal (visible solo si membresía activa) -->
+  <div id="app" style="display:none">
+    <header>
+      <a href="../index.html" class="logo">FIT<span>.</span>HOUSE</a>
+      <div style="display:flex;align-items:center;gap:16px">
+        <span id="header-name" style="font-size:13px;color:var(--muted)"></span>
+        <button class="btn btn-ghost btn-sm" id="logout-btn">Salir</button>
+      </div>
+    </header>
+
+    <div class="app-shell">
+
+      <!-- Perfil -->
+      <div class="card">
+        <div class="profile-top">
+          <div class="avatar" id="avatar-initials">?</div>
+          <div>
+            <div class="eyebrow">Perfil del Atleta</div>
+            <div class="profile-name" id="profile-name">—</div>
+            <div style="display:flex;align-items:center;gap:12px;margin-top:6px">
+              <span class="badge badge-green" id="status-badge">● Activo</span>
+              <span style="font-size:12px;color:var(--muted)">
+                Vence: <span id="vence-date" style="color:var(--text)">—</span>
+              </span>
+              <span class="badge badge-accent" id="dias-badge"></span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats -->
+      <div class="stats-row">
+        <div class="stat-card">
+          <div class="stat-value" id="stat-dias-mes">—</div>
+          <div class="stat-label">Días este mes</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-ultima">—</div>
+          <div class="stat-label">Última visita</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="stat-dias-rest" style="color:var(--green)">—</div>
+          <div class="stat-label">Días restantes</div>
+        </div>
+      </div>
+
+      <!-- QR dinámico -->
+      <div class="card qr-section">
+        <div class="eyebrow" style="text-align:center">Código de Acceso</div>
+        <div style="font-family:var(--font-display);font-size:28px;letter-spacing:0.04em;text-align:center;margin-bottom:4px">
+          TU PASE DE ENTRADA
+        </div>
+        <p style="font-size:13px;color:var(--muted);text-align:center;max-width:320px">
+          Muestra este QR al llegar. Se actualiza cada 30 segundos — no funciona en capturas de pantalla compartidas.
+        </p>
+
+        <div class="qr-box" id="qr-canvas"></div>
+
+        <div class="qr-countdown">
+          <span>Renueva en <span id="countdown-secs">30</span>s</span>
+          <div class="countdown-bar">
+            <div class="countdown-fill" id="countdown-fill" style="width:100%"></div>
+          </div>
+        </div>
+        <div class="qr-label">Anti-fraude activado — expira cada 30 segundos</div>
+      </div>
+
+      <!-- Aforo en vivo -->
+      <div class="card">
+        <div class="eyebrow">Estado del gimnasio</div>
+        <div class="aforo-card">
+          <div class="gauge-wrap">
+            <svg class="gauge-svg" width="140" height="140" viewBox="0 0 140 140">
+              <!-- radio = 60 → circunferencia ≈ 377 -->
+              <circle class="gauge-track" cx="70" cy="70" r="60" stroke-width="8"/>
+              <circle id="gauge-fill" cx="70" cy="70" r="60"
+                      fill="none" stroke-width="8" stroke-linecap="round"
+                      stroke-dasharray="377" stroke-dashoffset="377"
+                      style="transition:stroke-dashoffset 1s var(--ease),stroke .4s ease"/>
+            </svg>
+            <div class="gauge-center">
+              <div id="gauge-pct">—</div>
+              <div style="font-size:11px;color:var(--muted)">%</div>
+            </div>
+          </div>
+          <div>
+            <div style="font-family:var(--font-display);font-size:26px;letter-spacing:0.04em;margin-bottom:8px" id="aforo-label">
+              Cargando...
+            </div>
+            <div style="font-size:13px;color:var(--muted);line-height:1.6">
+              Personas registradas en las <strong style="color:var(--text)">últimas 2 horas</strong>.
+              Capacidad máxima: <strong style="color:var(--text)" id="cap-max">—</strong> atletas.
+            </div>
+            <div style="margin-top:16px">
+              <button class="btn btn-ghost btn-sm" id="aforo-refresh">↻ Actualizar aforo</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /app-shell -->
+  </div><!-- /app -->
+
+  <script type="module">
+    import {
+      getClient, getSession, getMiembro,
+      membresiaActiva, toast, formatDate, diasRestantes,
+      generarPayloadQR
+    } from '../js/supabase-client.js';
+
+    const sb = getClient();
+
+    // ── Constante: capacidad máxima del gimnasio ─────────────────
+    // Ajusta este valor a la capacidad real del local.
+    const CAPACIDAD_MAX = 40;
+
+    // ── Auth guard ───────────────────────────────────────────────
+    async function init() {
+      const session = await getSession();
+      if (!session) {
+        window.location.href = 'login.html';
+        return;
+      }
+
+      let miembro;
+      try {
+        miembro = await getMiembro(session.user.id);
+      } catch {
+        toast('Error al cargar tu perfil. Recarga la página.', 'error');
+        return;
+      }
+
+      document.getElementById('loading-screen').style.display = 'none';
+
+      // Si es admin → redirigir al panel admin
+      if (miembro.rol === 'admin') {
+        window.location.href = 'admin.html';
+        return;
+      }
+
+      // ── Verificar membresía ──────────────────────────────────
+      if (!membresiaActiva(miembro)) {
+        const paywall = document.getElementById('paywall');
+        paywall.style.display = 'flex';
+
+        document.getElementById('logout-paywall').addEventListener('click', async () => {
+          await sb.auth.signOut();
+          window.location.href = 'login.html';
+        });
+        return;
+      }
+
+      // ── Mostrar app ──────────────────────────────────────────
+      document.getElementById('app').style.display = 'block';
+      renderPerfil(miembro, session.user.id);
+      iniciarQR(session.user.id);
+      cargarStats(session.user.id);
+      cargarAforo();
+    }
+
+    // ── Render perfil ────────────────────────────────────────────
+    function renderPerfil(m, userId) {
+      document.getElementById('header-name').textContent = m.nombre;
+      document.getElementById('profile-name').textContent = m.nombre.toUpperCase();
+
+      // Iniciales del avatar
+      const ini = m.nombre.split(' ').map(p => p[0]).join('').slice(0, 2).toUpperCase();
+      document.getElementById('avatar-initials').textContent = ini;
+
+      // Fecha vencimiento y días restantes
+      const dias = diasRestantes(m.fecha_vencimiento);
+      document.getElementById('vence-date').textContent   = formatDate(m.fecha_vencimiento);
+      document.getElementById('dias-badge').textContent   = `${dias} días`;
+      document.getElementById('stat-dias-rest').textContent = dias;
+
+      // Si quedan menos de 5 días → advertir
+      if (dias <= 5) {
+        document.getElementById('status-badge').className = 'badge badge-amber';
+        document.getElementById('status-badge').textContent = `⚠ Vence pronto`;
+        toast(`Tu membresía vence en ${dias} día(s). ¡Renueva en recepción!`, 'info', 6000);
+      }
+    }
+
+    // ── Stats del atleta ─────────────────────────────────────────
+    async function cargarStats(userId) {
+      try {
+        const { data, error } = await sb.rpc('get_mis_stats');
+        if (error) throw error;
+
+        document.getElementById('stat-dias-mes').textContent = data.dias_mes ?? 0;
+        document.getElementById('stat-ultima').textContent =
+          data.ultima_visita ? formatDate(data.ultima_visita) : 'Primera vez';
+      } catch {
+        document.getElementById('stat-dias-mes').textContent = '—';
+      }
+    }
+
+    // ── QR dinámico anti-fraude ──────────────────────────────────
+    // El QR se regenera automáticamente cada 30 segundos.
+    // Cada payload incluye el userId + ventana temporal de 30s.
+
+    let qrInstance = null;
+
+    function generarQR(userId) {
+      const payload = generarPayloadQR(userId);
+      const canvas  = document.getElementById('qr-canvas');
+
+      if (qrInstance) {
+        qrInstance.clear();
+        qrInstance.makeCode(payload);
+      } else {
+        qrInstance = new QRCode(canvas, {
+          text:          payload,
+          width:         220,
+          height:        220,
+          colorDark:     '#0A0A0A',
+          colorLight:    '#FFFFFF',
+          correctLevel:  QRCode.CorrectLevel.M,
+        });
+      }
+    }
+
+    function iniciarQR(userId) {
+      generarQR(userId);
+
+      // Countdown visual de 30 segundos
+      let secsLeft = 30 - (Math.floor(Date.now() / 1000) % 30);
+
+      const secsEl  = document.getElementById('countdown-secs');
+      const fillEl  = document.getElementById('countdown-fill');
+
+      function tick() {
+        secsEl.textContent = secsLeft;
+        fillEl.style.width = `${(secsLeft / 30) * 100}%`;
+
+        if (secsLeft <= 0) {
+          secsLeft = 30;
+          generarQR(userId);   // nuevo QR
+        } else {
+          secsLeft--;
+        }
+      }
+
+      tick();
+      setInterval(tick, 1000);
+    }
+
+    // ── Aforo en vivo ────────────────────────────────────────────
+    // Consulta la función SQL get_aforo_actual() que cuenta las
+    // asistencias registradas en las últimas 2 horas.
+    //
+    // Rangos visuales basados en CAPACIDAD_MAX:
+    //   0–40%   → Verde  (espacio cómodo)
+    //   41–70%  → Ámbar  (moderado)
+    //   71–100% → Rojo   (lleno)
+
+    async function cargarAforo() {
+      document.getElementById('cap-max').textContent = CAPACIDAD_MAX;
+
+      try {
+        const { data: count, error } = await sb.rpc('get_aforo_actual');
+        if (error) throw error;
+
+        const pct = Math.min(Math.round((count / CAPACIDAD_MAX) * 100), 100);
+
+        // Determinar color y etiqueta
+        let color, label;
+        if (pct <= 40) {
+          color = 'var(--green)'; label = 'Espacio Ideal — Máquinas Libres';
+        } else if (pct <= 70) {
+          color = 'var(--amber)'; label = 'Flujo Moderado';
+        } else {
+          color = 'var(--red)'; label = '¡Full! — Hora pico activa';
+        }
+
+        // Actualizar gauge
+        // Circunferencia con radio 60: 2π×60 ≈ 377
+        const CIRC   = 2 * Math.PI * 60;
+        const offset = CIRC - (pct / 100) * CIRC;
+        const fill   = document.getElementById('gauge-fill');
+        fill.style.strokeDashoffset = offset;
+        fill.style.stroke = color;
+
+        document.getElementById('gauge-pct').textContent   = pct;
+        document.getElementById('aforo-label').textContent = label;
+
+      } catch (err) {
+        document.getElementById('aforo-label').textContent = 'Sin datos';
+      }
+    }
+
+    // Refrescar aforo cada 3 minutos
+    setInterval(cargarAforo, 180000);
+    document.getElementById('aforo-refresh').addEventListener('click', cargarAforo);
+
+    // ── Logout ───────────────────────────────────────────────────
+    document.getElementById('logout-btn').addEventListener('click', async () => {
+      await sb.auth.signOut();
+      window.location.href = 'login.html';
+    });
+
+    // ── Arrancar ─────────────────────────────────────────────────
+    init();
+  </script>
+</body>
+</html>
