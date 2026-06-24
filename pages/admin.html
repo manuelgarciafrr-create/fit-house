@@ -265,6 +265,17 @@
         <div style="font-size:12px;color:var(--muted);margin-top:6px" id="aforo-label-admin">Cargando...</div>
       </div>
 
+      <!-- Apertura manual de puerta (ESP32 en red local del gym) -->
+      <!-- Solo funciona si este dispositivo está conectado al mismo WiFi
+           que el microcontrolador. Úsalo para casos especiales: clientes
+           nuevos sin QR aún, visitas, proveedores, etc. -->
+      <div class="card" style="padding:20px">
+        <button id="btn-abrir-puerta" class="btn btn-primary" style="width:100%;font-size:16px;padding:16px" onclick="abrirPuertaManual()">
+          🔓 Abrir Puerta
+        </button>
+        <div id="puerta-status" style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center"></div>
+      </div>
+
       <!-- Grid principal: lista + panel -->
       <!-- Alpine.js maneja el estado del buscador y del miembro seleccionado -->
       <div class="admin-grid" x-data="adminApp()" x-init="init()">
@@ -473,6 +484,42 @@
     }
 
     cargarKPIs();
+
+    // ── Apertura manual de puerta (vía comando en Supabase) ────────
+    // El ESP32, conectado a su propio WiFi con internet, revisa esta
+    // tabla cada 1-2 segundos y abre la puerta cuando ve un comando
+    // pendiente. Esto funciona sin importar en qué red esté este admin.
+    window.abrirPuertaManual = async function () {
+      const btn    = document.getElementById('btn-abrir-puerta');
+      const status = document.getElementById('puerta-status');
+
+      btn.disabled = true;
+      btn.textContent = 'Abriendo...';
+      status.style.color = 'var(--muted)';
+      status.textContent = 'Enviando comando...';
+
+      try {
+        const { error } = await getClient()
+          .from('comandos_puerta')
+          .insert({ origen: 'admin_manual' });
+
+        if (error) {
+          status.style.color = 'var(--red)';
+          status.textContent = '⚠️ No se pudo enviar el comando: ' + error.message;
+        } else {
+          status.style.color = 'var(--green)';
+          status.textContent = '✅ Comando enviado. La puerta debería abrir en unos segundos.';
+        }
+      } catch (err) {
+        status.style.color = 'var(--red)';
+        status.textContent = '⚠️ Error inesperado al enviar el comando.';
+      } finally {
+        setTimeout(() => {
+          btn.disabled = false;
+          btn.textContent = '🔓 Abrir Puerta';
+        }, 3000);
+      }
+    };
 
     // ── Aforo barra ───────────────────────────────────────────────
     async function cargarAforo() {
