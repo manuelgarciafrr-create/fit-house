@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Fit House — Crear contraseña</title>
+  <link rel="stylesheet" href="../css/tokens.css"/>
+
+  <!-- Supabase JS v2 via CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+
+  <style>
+    body {
+      display: grid;
+      place-items: center;
+      min-height: 100vh;
+      padding: 24px;
+      background-image: repeating-linear-gradient(
+        90deg, transparent, transparent 119px,
+        rgba(255,255,255,0.012) 120px
+      );
+    }
+
+    .login-wrap {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 32px;
+    }
+
+    .login-header { text-align: center; }
+
+    .login-headline {
+      font-family: var(--font-display);
+      font-size: 44px;
+      letter-spacing: 0.04em;
+      line-height: 0.95;
+      margin: 16px 0 8px;
+    }
+
+    .login-sub {
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    .login-form {
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+    }
+
+    .form-group { display: flex; flex-direction: column; }
+
+    #clave-error {
+      display: none;
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      background: var(--red-dim);
+      border: 1px solid rgba(255,23,68,0.3);
+      font-size: 13px;
+      color: var(--red);
+    }
+
+    #clave-ok {
+      display: none;
+      padding: 16px;
+      border-radius: var(--radius);
+      background: var(--green-dim);
+      border: 1px solid rgba(0,230,118,0.25);
+      font-size: 13px;
+      color: var(--green);
+      text-align: center;
+      line-height: 1.6;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="toast-container"></div>
+
+  <div class="login-wrap">
+
+    <div class="login-header">
+      <a href="../index.html" class="logo">FIT<span>.</span>HOUSE</a>
+      <h1 class="login-headline">CREA TU<br>CONTRASEÑA</h1>
+      <p class="login-sub">Último paso para activar tu acceso al gym.</p>
+    </div>
+
+    <div class="card">
+      <form class="login-form" id="clave-form">
+        <div id="clave-error"></div>
+        <div id="clave-ok">
+          ✅ Contraseña guardada.<br>
+          Redirigiendo a inicio de sesión...
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="password">Nueva contraseña</label>
+          <input class="form-input" id="password" type="password" placeholder="••••••••" required minlength="6" autocomplete="new-password"/>
+        </div>
+
+        <button class="btn btn-primary" type="submit" id="clave-btn">
+          Guardar contraseña →
+        </button>
+      </form>
+    </div>
+
+    <div class="login-footer" style="text-align:center;font-size:12px;color:var(--muted)">
+      ¿Problemas? Visita recepción o escríbenos por
+      <a href="https://wa.me/TU_NUMERO" target="_blank" style="color:var(--accent)">WhatsApp</a>.
+    </div>
+
+  </div>
+
+  <script type="module">
+    import { getClient, toast } from '../js/supabase-client.js';
+
+    const sb       = getClient();
+    const form     = document.getElementById('clave-form');
+    const claveBtn = document.getElementById('clave-btn');
+    const errorBox = document.getElementById('clave-error');
+    const okBox    = document.getElementById('clave-ok');
+
+    // El link de invitación/recovery de Supabase deja una sesión temporal
+    // activa automáticamente al abrir esta página (vía el token en la URL).
+    // No pedimos correo aquí para que el cliente no pueda alterarlo:
+    // updateUser() siempre actúa sobre la sesión ya autenticada.
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      errorBox.style.display = 'none';
+      okBox.style.display    = 'none';
+
+      const password = document.getElementById('password').value;
+
+      if (password.length < 6) {
+        errorBox.textContent = 'La contraseña debe tener al menos 6 caracteres.';
+        errorBox.style.display = 'block';
+        return;
+      }
+
+      claveBtn.disabled    = true;
+      claveBtn.textContent = 'Guardando...';
+
+      try {
+        const { error } = await sb.auth.updateUser({ password });
+
+        if (error) {
+          errorBox.textContent = error.message;
+          errorBox.style.display = 'block';
+          claveBtn.disabled    = false;
+          claveBtn.textContent = 'Guardar contraseña →';
+          return;
+        }
+
+        // Éxito: mostramos confirmación y redirigimos a login
+        form.querySelectorAll('.form-group, #clave-btn').forEach(el => el.style.display = 'none');
+        okBox.style.display = 'block';
+
+        setTimeout(() => {
+          window.location.href = 'login.html';
+        }, 2000);
+
+      } catch (err) {
+        errorBox.textContent = 'Ocurrió un error inesperado. Intenta de nuevo.';
+        errorBox.style.display = 'block';
+        claveBtn.disabled    = false;
+        claveBtn.textContent = 'Guardar contraseña →';
+      }
+    });
+  </script>
+
+</body>
+</html>
