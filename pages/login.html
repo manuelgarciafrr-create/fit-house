@@ -180,20 +180,10 @@
     magicBtn.dataset.label = 'Enviarme link mágico al correo';
 
     // ── Redirigir si ya hay sesión activa ───────────────────────
-    sb.auth.onAuthStateChange(async (event, session) => {
-  if (session) {
-    const { data: perfil } = await sb.from('miembros_gym')
-      .select('rol')
-      .eq('id', session.user.id)
-      .single();
-      
-    if (perfil && perfil.rol === 'admin') {
-      window.location.href = 'admin.html';
-    } else {
-      window.location.href = 'app.html';
-    }
-  }
-});
+    sb.auth.getSession().then(({ data: { session } }) => {
+      if (session) window.location.href = 'app.html';
+    });
+
     // ── Login con email + contraseña ────────────────────────────
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
@@ -212,23 +202,8 @@
       }
 
       // Redirigir a la app principal
-      // ✅ REEMPLAZO INTELIGENTE PARA EL LOGIN
-      const { data: { user } } = await sb.auth.getUser();
-
-      if (user) {
-        const { data: perfil } = await sb.from('miembros_gym')
-          .select('rol')
-          .eq('id', user.id)
-          .single();
-
-        if (perfil && perfil.rol === 'admin') {
-          window.location.href = 'admin.html';
-        } else {
-          window.location.href = 'app.html';
-        }
-      } else {
-        window.location.href = 'app.html';
-      }
+      window.location.href = 'app.html';
+    });
 
     // ── Magic Link (sin contraseña) ─────────────────────────────
     magicBtn.addEventListener('click', async () => {
