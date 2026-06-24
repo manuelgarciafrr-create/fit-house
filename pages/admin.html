@@ -577,12 +577,16 @@
           });
 
           // Realtime: actualizar lista si cambia la tabla (Supabase Realtime)
-          getClient()
-            .channel('miembros_changes')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'miembros_gym' },
-              () => this.cargarMiembros()
-            )
-            .subscribe();
+          // Se protege contra doble inicialización (ej: si init() se llama
+          // más de una vez por algún re-render de Alpine).
+          if (!window.__miembrosRealtimeChannel) {
+            window.__miembrosRealtimeChannel = getClient()
+              .channel('miembros_changes')
+              .on('postgres_changes', { event: '*', schema: 'public', table: 'miembros_gym' },
+                () => this.cargarMiembros()
+              )
+              .subscribe();
+          }
         },
 
         // ── Cargar todos los miembros ──────────────────────────────
