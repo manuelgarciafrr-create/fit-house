@@ -212,8 +212,23 @@
       }
 
       // Redirigir a la app principal
-      window.location.href = 'app.html';
-    });
+      // ✅ REEMPLAZO INTELIGENTE PARA EL LOGIN
+      const { data: { user } } = await sb.auth.getUser();
+
+      if (user) {
+        const { data: perfil } = await sb.from('miembros_gym')
+          .select('rol')
+          .eq('id', user.id)
+          .single();
+
+        if (perfil && perfil.rol === 'admin') {
+          window.location.href = 'admin.html';
+        } else {
+          window.location.href = 'app.html';
+        }
+      } else {
+        window.location.href = 'app.html';
+      }
 
     // ── Magic Link (sin contraseña) ─────────────────────────────
     magicBtn.addEventListener('click', async () => {
