@@ -240,6 +240,24 @@
 
       const nombre = miembro?.nombre ?? 'Atleta';
 
+      // Paso 4: Acceso concedido de verdad — crear un comando de apertura.
+      // Solo se llega aquí si registrar_asistencia() confirmó membresía
+      // activa y que no había ingresado hoy. En cualquier camino de error
+      // de arriba, esta línea nunca se ejecuta y la puerta permanece cerrada.
+      //
+      // En vez de llamar directo al ESP32 (lo cual exigiría que este
+      // dispositivo esté en la misma red WiFi local que el ESP32),
+      // insertamos un "comando pendiente" en Supabase. El ESP32, conectado
+      // a su propio WiFi con internet, lo detecta en segundos y abre la
+      // puerta. Así el scanner puede estar en cualquier red.
+      try {
+        await sb.from('comandos_puerta').insert({ origen: 'scanner_qr' });
+      } catch (errPuerta) {
+        // No bloqueamos el acceso si esto falla — el admin puede abrir
+        // manual desde admin.html si hace falta.
+        console.warn('No se pudo registrar el comando de apertura:', errPuerta);
+      }
+
       mostrarResultado('success', {
         icon: '✅',
         title: '¡ACCESO CONCEDIDO!',
