@@ -8,8 +8,8 @@
 
   <!-- Supabase JS v2 -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
-  <!-- Alpine.js v3 para reactividad del buscador -->
-  <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+  <!-- Alpine.js v3 se importa dentro del <script type="module"> al final del archivo,
+       para garantizar que adminApp() ya exista antes de que Alpine arranque. -->
 
   <style>
     /* ── Shell ─────────────────────────────────────────────────── */
@@ -435,7 +435,7 @@
     import { getClient, getSession, getMiembro, toast, formatDate } from '../js/supabase-client.js';
 
     const sb = getClient();
-    const CAPACIDAD_MAX = 40;   // ← ajustar a capacidad real
+    const CAPACIDAD_MAX = 200;   // ← ajustar a capacidad real
 
     // ── Auth guard + rol ─────────────────────────────────────────
     const session = await getSession();
@@ -690,6 +690,13 @@
         }
       };
     };
+
+    // ── Cargar e iniciar Alpine.js AHORA, ya que adminApp() existe ──
+    // (Se importa aquí, en vez de un <script> normal en el <head>,
+    //  para evitar que Alpine arranque antes de que adminApp() esté lista.)
+    import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js';
+    window.Alpine = Alpine;
+    Alpine.start();
   </script>
 
   <!--
