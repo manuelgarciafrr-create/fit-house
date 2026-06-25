@@ -276,6 +276,73 @@
         <div id="puerta-status" style="font-size:12px;color:var(--muted);margin-top:8px;text-align:center"></div>
       </div>
 
+      <!-- Gestión de productos de la tienda (creatina, straps, etc.) -->
+      <div class="card" style="padding:20px" x-data="productosApp()" x-init="init()">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;color:var(--muted)">PRODUCTOS DE LA TIENDA</span>
+          <button class="btn btn-ghost btn-sm" @click="mostrarForm = !mostrarForm" x-text="mostrarForm ? 'Cancelar' : '+ Agregar producto'"></button>
+        </div>
+
+        <!-- Formulario para agregar producto nuevo -->
+        <div x-show="mostrarForm" style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--border)">
+          <input class="form-input" type="text" placeholder="Nombre del producto (ej. Creatina 300g)" x-model="nuevoNombre"/>
+          <input class="form-input" type="text" placeholder="Link de la imagen (URL)" x-model="nuevaImagen"/>
+          <input class="form-input" type="number" step="0.01" placeholder="Precio (opcional)" x-model="nuevoPrecio"/>
+          <input class="form-input" type="text" placeholder="Descripción breve (opcional)" x-model="nuevaDescripcion"/>
+          <button class="btn btn-primary btn-sm" @click="guardarProducto()" :disabled="guardando">
+            <span x-text="guardando ? 'Guardando...' : 'Guardar producto'"></span>
+          </button>
+          <p x-show="errorMsg" x-text="errorMsg" style="color:var(--red);font-size:12px"></p>
+        </div>
+
+        <!-- Lista de productos existentes -->
+        <div x-show="loading" style="text-align:center;padding:20px;color:var(--muted)">Cargando productos...</div>
+        <div x-show="!loading && productos.length === 0" style="text-align:center;padding:20px;color:var(--muted);font-size:13px">
+          Aún no has agregado productos.
+        </div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <template x-for="p in productos" :key="p.id">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--surface2);border-radius:var(--radius)">
+              <img :src="p.imagen_url" style="width:48px;height:48px;object-fit:cover;border-radius:6px;background:var(--surface3)" onerror="this.style.opacity=0.2"/>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:600" x-text="p.nombre"></div>
+                <div style="font-size:12px;color:var(--muted)" x-text="p.precio ? ('$' + p.precio) : ''"></div>
+              </div>
+              <button class="btn btn-ghost btn-sm" @click="borrarProducto(p.id)" style="color:var(--red)">Borrar</button>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Citas pendientes (inscripción y renovación) -->
+      <div class="card" style="padding:20px" x-data="citasApp()" x-init="init()">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+          <span style="font-family:var(--font-mono);font-size:10px;letter-spacing:0.18em;color:var(--muted)">CITAS PENDIENTES</span>
+          <button class="btn btn-ghost btn-sm" @click="cargarCitas()">↻</button>
+        </div>
+
+        <div x-show="loading" style="text-align:center;padding:20px;color:var(--muted)">Cargando citas...</div>
+        <div x-show="!loading && citas.length === 0" style="text-align:center;padding:20px;color:var(--muted);font-size:13px">
+          No hay citas pendientes.
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <template x-for="c in citas" :key="c.id">
+            <div style="display:flex;align-items:center;gap:12px;padding:10px;background:var(--surface2);border-radius:var(--radius)">
+              <span style="font-size:18px" x-text="c.tipo === 'inscripcion' ? '🆕' : '🔄'"></span>
+              <div style="flex:1">
+                <div style="font-size:14px;font-weight:600" x-text="c.nombre"></div>
+                <div style="font-size:12px;color:var(--muted)">
+                  <span x-text="c.tipo === 'inscripcion' ? 'Inscripción' : 'Renovación'"></span>
+                  · <span x-text="formatFecha(c.fecha_cita)"></span>
+                </div>
+              </div>
+              <button class="btn btn-ghost btn-sm" @click="marcarAtendida(c.id)">✓ Atendida</button>
+            </div>
+          </template>
+        </div>
+      </div>
+
       <!-- Grid principal: lista + panel -->
       <!-- Alpine.js maneja el estado del buscador y del miembro seleccionado -->
       <div class="admin-grid" x-data="adminApp()" x-init="init()">
@@ -590,6 +657,123 @@
       setTimeout(() => window.dispatchEvent(new CustomEvent('reload-members')), 1500);
     });
 
+
+    // ================================================================
+    // ALPINE.JS — productosApp()
+    // Gestiona: alta, listado y borrado de productos de la tienda.
+    // ================================================================
+    window.productosApp = function () {
+      return {
+        productos: [],
+        loading: true,
+        mostrarForm: false,
+        guardando: false,
+        errorMsg: '',
+        nuevoNombre: '',
+        nuevaImagen: '',
+        nuevoPrecio: '',
+        nuevaDescripcion: '',
+
+        async init() {
+          await this.cargarProductos();
+        },
+
+        async cargarProductos() {
+          this.loading = true;
+          const { data, error } = await getClient()
+            .from('productos')
+            .select('*')
+            .eq('activo', true)
+            .order('created_at', { ascending: false });
+
+          if (!error) this.productos = data ?? [];
+          this.loading = false;
+        },
+
+        async guardarProducto() {
+          this.errorMsg = '';
+
+          if (!this.nuevoNombre.trim() || !this.nuevaImagen.trim()) {
+            this.errorMsg = 'El nombre y el link de la imagen son obligatorios.';
+            return;
+          }
+
+          this.guardando = true;
+
+          const { error } = await getClient().from('productos').insert({
+            nombre: this.nuevoNombre.trim(),
+            imagen_url: this.nuevaImagen.trim(),
+            precio: this.nuevoPrecio ? parseFloat(this.nuevoPrecio) : null,
+            descripcion: this.nuevaDescripcion.trim() || null
+          });
+
+          this.guardando = false;
+
+          if (error) {
+            this.errorMsg = 'Error al guardar: ' + error.message;
+            return;
+          }
+
+          this.nuevoNombre = '';
+          this.nuevaImagen = '';
+          this.nuevoPrecio = '';
+          this.nuevaDescripcion = '';
+          this.mostrarForm = false;
+          await this.cargarProductos();
+        },
+
+        async borrarProducto(id) {
+          const { error } = await getClient()
+            .from('productos')
+            .update({ activo: false })
+            .eq('id', id);
+
+          if (!error) await this.cargarProductos();
+        }
+      };
+    };
+
+    // ================================================================
+    // ALPINE.JS — citasApp()
+    // Lista las citas de inscripción/renovación pendientes para que
+    // el recepcionista sepa quién va a llegar y cuándo.
+    // ================================================================
+    window.citasApp = function () {
+      return {
+        citas: [],
+        loading: true,
+
+        async init() {
+          await this.cargarCitas();
+        },
+
+        async cargarCitas() {
+          this.loading = true;
+          const { data, error } = await getClient()
+            .from('citas')
+            .select('*')
+            .eq('atendida', false)
+            .order('fecha_cita', { ascending: true });
+
+          if (!error) this.citas = data ?? [];
+          this.loading = false;
+        },
+
+        async marcarAtendida(id) {
+          const { error } = await getClient()
+            .from('citas')
+            .update({ atendida: true })
+            .eq('id', id);
+
+          if (!error) await this.cargarCitas();
+        },
+
+        formatFecha(fechaStr) {
+          const [year, month, day] = fechaStr.split('-');
+          return `${day}/${month}/${year}`;
+        }
+      };
+    };
 
     // ================================================================
     // ALPINE.JS — adminApp()
