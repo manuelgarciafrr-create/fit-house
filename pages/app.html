@@ -184,6 +184,80 @@
       font-family: var(--font-display); font-size: 38px;
       line-height: 1; color: var(--white);
     }
+
+    /* ── Productos de la tienda ───────────────────────────────────── */
+    .productos-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+      gap: 14px;
+    }
+    @media (max-width: 480px) {
+      .productos-grid { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+    }
+    .producto-card {
+      background: var(--surface2);
+      border-radius: var(--radius);
+      padding: 12px;
+      display: flex; flex-direction: column; gap: 8px;
+    }
+    .producto-img {
+      width: 100%; aspect-ratio: 1/1;
+      object-fit: cover; border-radius: 8px;
+      background: var(--surface3);
+    }
+    .producto-nombre { font-size: 13px; font-weight: 600; line-height: 1.3; }
+    .producto-precio { font-size: 12px; color: var(--accent); font-family: var(--font-mono); }
+
+    /* ── Calculadora 1RM ───────────────────────────────────────────── */
+    .rm-inputs {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+    @media (max-width: 420px) { .rm-inputs { grid-template-columns: 1fr; } }
+
+    .barbell-wrap {
+      display: flex; align-items: center; justify-content: center;
+      gap: 4px; padding: 24px 4px;
+      overflow-x: auto;
+    }
+    .plate {
+      flex-shrink: 0;
+      border-radius: 4px;
+      background: var(--accent);
+      display: flex; align-items: center; justify-content: center;
+      font-family: var(--font-mono); font-size: 9px; font-weight: 700;
+      color: var(--bg);
+    }
+    .bar-segment {
+      flex-shrink: 0; height: 10px; width: 36px;
+      background: var(--surface3);
+    }
+    .bar-sleeve {
+      flex-shrink: 0; height: 16px; width: 14px;
+      background: var(--surface3); border-radius: 2px;
+    }
+    #rm-resultado-txt {
+      text-align: center; font-size: 13px; color: var(--muted);
+      margin-top: 8px;
+    }
+
+    /* ── Modal de cita (renovación) ────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(0,0,0,0.7);
+      align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px 24px;
+      max-width: 360px; width: 100%;
+    }
   </style>
 </head>
 <body>
@@ -202,12 +276,38 @@
     <h2 class="paywall-headline">SUSCRIPCIÓN<br>VENCIDA</h2>
     <p class="paywall-sub">
       Tu acceso al gimnasio ha expirado.<br>
-      Pasa por recepción para renovar tu mes y reactivar tu perfil.
+      Agenda tu cita para renovar tu membresía.
     </p>
-    <a href="https://wa.me/584120361856?text=Hola%20Fit%20House%2C%20necesito%20renovar%20mi%20membres%C3%ADa." target="_blank" class="btn btn-danger" style="margin-bottom:16px">
-      Contactar por WhatsApp →
+    <button class="btn btn-primary" id="btn-abrir-cita-renovacion" style="margin-bottom:12px">
+      📅 Agendar renovación
+    </button>
+    <a href="https://wa.me/TU_NUMERO?text=Hola%20Fit%20House%2C%20necesito%20renovar%20mi%20membres%C3%ADa." target="_blank" class="btn btn-ghost btn-sm" style="margin-bottom:16px">
+      O escríbenos por WhatsApp →
     </a>
     <button class="btn btn-ghost btn-sm" id="logout-paywall">Cerrar sesión</button>
+  </div>
+
+  <!-- Modal: agendar cita de renovación -->
+  <div class="modal-overlay" id="modal-cita-renovacion">
+    <div class="modal-box">
+      <h3 style="font-family:var(--font-display);font-size:22px;margin-bottom:6px">AGENDAR RENOVACIÓN</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px">
+        Indícanos tu nombre y el día que vendrás a renovar, para que recepción te esté esperando.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group">
+          <label class="form-label">Tu nombre</label>
+          <input class="form-input" type="text" id="cita-renovacion-nombre" placeholder="Nombre completo"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha en la que vendrás</label>
+          <input class="form-input" type="date" id="cita-renovacion-fecha"/>
+        </div>
+        <p id="cita-renovacion-error" style="display:none;color:var(--red);font-size:12px"></p>
+        <button class="btn btn-primary" id="btn-confirmar-cita-renovacion">Confirmar cita</button>
+        <button class="btn btn-ghost btn-sm" id="btn-cerrar-cita-renovacion">Cancelar</button>
+      </div>
+    </div>
   </div>
 
   <!-- App principal (visible solo si membresía activa) -->
@@ -307,6 +407,51 @@
               <button class="btn btn-ghost btn-sm" id="aforo-refresh">↻ Actualizar aforo</button>
             </div>
           </div>
+        </div>
+      </div>
+
+      <!-- Calculadora de discos por lado -->
+      <div class="card" x-data="rmApp()">
+        <div class="eyebrow">Calculadora de discos</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+          Pon el peso total que quieres levantar y te decimos qué discos poner de cada lado de la barra.
+        </p>
+
+        <div class="rm-inputs">
+          <div class="form-group">
+            <label class="form-label">Peso total deseado (kg)</label>
+            <input class="form-input" type="number" inputmode="decimal" placeholder="100" x-model.number="pesoTotal" @input="calcular()"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Peso de la barra (kg)</label>
+            <input class="form-input" type="number" inputmode="decimal" placeholder="20" x-model.number="pesoBarra" @input="calcular()"/>
+          </div>
+        </div>
+
+        <div class="barbell-wrap">
+          <div class="bar-segment"></div>
+          <div class="bar-sleeve"></div>
+          <template x-for="(disco, idx) in discosPorLado" :key="idx">
+            <div class="plate" :style="'width:' + disco.ancho + 'px;height:' + disco.alto + 'px'" x-text="disco.peso"></div>
+          </template>
+          <div class="bar-sleeve" style="margin-left:6px"></div>
+        </div>
+
+        <p id="rm-resultado-txt" x-text="resultadoTexto"></p>
+      </div>
+
+      <!-- Productos de la tienda -->
+      <div class="card" x-data="productosClienteApp()" x-init="init()" x-show="productos.length > 0 || loading">
+        <div class="eyebrow">Tienda del gym</div>
+        <div x-show="loading" style="text-align:center;padding:20px;color:var(--muted);font-size:13px">Cargando productos...</div>
+        <div class="productos-grid" x-show="!loading">
+          <template x-for="p in productos" :key="p.id">
+            <div class="producto-card">
+              <img class="producto-img" :src="p.imagen_url" onerror="this.style.opacity=0.15"/>
+              <div class="producto-nombre" x-text="p.nombre"></div>
+              <div class="producto-precio" x-show="p.precio" x-text="'$' + p.precio"></div>
+            </div>
+          </template>
         </div>
       </div>
 
@@ -511,8 +656,133 @@
       window.location.href = 'login.html';
     });
 
-    // ── Arrancar ─────────────────────────────────────────────────
+    // ── Modal de cita de renovación (desde el paywall) ──────────────
+    const modalCita = document.getElementById('modal-cita-renovacion');
+
+    document.getElementById('btn-abrir-cita-renovacion').addEventListener('click', () => {
+      modalCita.style.display = 'flex';
+    });
+    document.getElementById('btn-cerrar-cita-renovacion').addEventListener('click', () => {
+      modalCita.style.display = 'none';
+    });
+
+    document.getElementById('btn-confirmar-cita-renovacion').addEventListener('click', async () => {
+      const nombre = document.getElementById('cita-renovacion-nombre').value.trim();
+      const fecha  = document.getElementById('cita-renovacion-fecha').value;
+      const errBox = document.getElementById('cita-renovacion-error');
+      errBox.style.display = 'none';
+
+      if (!nombre || !fecha) {
+        errBox.textContent = 'Completa tu nombre y la fecha.';
+        errBox.style.display = 'block';
+        return;
+      }
+
+      const { data: session } = await sb.auth.getSession();
+      const userId = session?.session?.user?.id ?? null;
+
+      const { error } = await sb.from('citas').insert({
+        tipo: 'renovacion',
+        nombre,
+        fecha_cita: fecha,
+        miembro_id: userId
+      });
+
+      if (error) {
+        errBox.textContent = 'No se pudo agendar: ' + error.message;
+        errBox.style.display = 'block';
+        return;
+      }
+
+      modalCita.style.display = 'none';
+      toast('Cita agendada. Te esperamos ese día en recepción.', 'success');
+    });
+
+    // ================================================================
+    // ALPINE.JS — rmApp()
+    // Calculadora visual de discos según el peso total deseado.
+    // ================================================================
+    window.rmApp = function () {
+      return {
+        pesoTotal: '',
+        pesoBarra: 20,
+        discosPorLado: [],
+        resultadoTexto: 'Ingresa un peso para ver los discos.',
+
+        calcular() {
+          const total = parseFloat(this.pesoTotal);
+          const barra = parseFloat(this.pesoBarra) || 0;
+
+          if (!total || total <= barra) {
+            this.discosPorLado = [];
+            this.resultadoTexto = total && total <= barra
+              ? 'El peso debe ser mayor al de la barra.'
+              : 'Ingresa un peso para ver los discos.';
+            return;
+          }
+
+          // Peso a repartir entre los 2 lados de la barra
+          let porLado = (total - barra) / 2;
+
+          // Discos disponibles típicos en un gym (kg)
+          const discosDisponibles = [25, 20, 15, 10, 5, 2.5, 1.25];
+          const resultado = [];
+
+          for (const disco of discosDisponibles) {
+            while (porLado >= disco - 0.001) {
+              resultado.push(disco);
+              porLado -= disco;
+            }
+          }
+
+          // Tamaños visuales proporcionales al peso del disco
+          this.discosPorLado = resultado.map(peso => ({
+            peso: peso % 1 === 0 ? peso : peso.toFixed(2),
+            alto: Math.min(36 + peso * 1.8, 110),
+            ancho: peso >= 15 ? 16 : peso >= 5 ? 12 : 8
+          }));
+
+          if (porLado > 0.01) {
+            this.resultadoTexto =
+              `${resultado.length} discos por lado. No se pudo completar exacto ` +
+              `(sobran ${porLado.toFixed(2)}kg) — considera ajustar el peso.`;
+          } else {
+            this.resultadoTexto = `${resultado.length} disco(s) por lado · Total real: ${total}kg`;
+          }
+        }
+      };
+    };
+
+    // ================================================================
+    // ALPINE.JS — productosClienteApp()
+    // Muestra los productos activos que el admin haya subido.
+    // ================================================================
+    window.productosClienteApp = function () {
+      return {
+        productos: [],
+        loading: true,
+
+        async init() {
+          const { data, error } = await sb
+            .from('productos')
+            .select('*')
+            .eq('activo', true)
+            .order('created_at', { ascending: false });
+
+          this.productos = (!error && data) ? data : [];
+          this.loading = false;
+        }
+      };
+    };
+
+    // ── Arrancar lógica principal (no-Alpine) ───────────────────────
     init();
+
+    // ── Cargar e iniciar Alpine.js AHORA, ya que las funciones de
+    //    arriba (rmApp, productosClienteApp) ya existen en window ──
+    import Alpine from 'https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/module.esm.js';
+    window.Alpine = Alpine;
+    Alpine.start();
   </script>
 </body>
 </html>
