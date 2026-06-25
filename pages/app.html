@@ -292,7 +292,7 @@
     <div class="modal-box">
       <h3 style="font-family:var(--font-display);font-size:22px;margin-bottom:6px">AGENDAR RENOVACIÓN</h3>
       <p style="font-size:13px;color:var(--muted);margin-bottom:20px">
-        Indícanos tu nombre y el día que vendrás a renovar, para que recepción te esté esperando.
+        Indícanos tu nombre, día y hora en la que vendrás a renovar, para que recepción te esté esperando.
       </p>
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="form-group">
@@ -300,8 +300,18 @@
           <input class="form-input" type="text" id="cita-renovacion-nombre" placeholder="Nombre completo"/>
         </div>
         <div class="form-group">
-          <label class="form-label">Fecha en la que vendrás</label>
-          <input class="form-input" type="date" id="cita-renovacion-fecha"/>
+          <label class="form-label">Tu correo</label>
+          <input class="form-input" type="email" id="cita-renovacion-correo" placeholder="tu@correo.com"/>
+        </div>
+        <div style="display:flex;gap:10px">
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Fecha</label>
+            <input class="form-input" type="date" id="cita-renovacion-fecha"/>
+          </div>
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Hora</label>
+            <input class="form-input" type="time" id="cita-renovacion-hora"/>
+          </div>
         </div>
         <p id="cita-renovacion-error" style="display:none;color:var(--red);font-size:12px"></p>
         <button class="btn btn-primary" id="btn-confirmar-cita-renovacion">Confirmar cita</button>
@@ -408,6 +418,33 @@
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- Calculadora de 1RM (máximo estimado a una repetición) -->
+      <div class="card" x-data="oneRmApp()">
+        <div class="eyebrow">Calculadora de 1RM</div>
+        <p style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.6">
+          Pon un peso que ya levantaste y cuántas repeticiones hiciste, y estimamos tu máximo a una repetición.
+        </p>
+
+        <div class="rm-inputs">
+          <div class="form-group">
+            <label class="form-label">Peso levantado (kg)</label>
+            <input class="form-input" type="number" inputmode="decimal" placeholder="80" x-model.number="pesoLevantado" @input="calcularRM()"/>
+          </div>
+          <div class="form-group">
+            <label class="form-label">Repeticiones hechas</label>
+            <input class="form-input" type="number" inputmode="numeric" placeholder="5" x-model.number="repeticiones" @input="calcularRM()"/>
+          </div>
+        </div>
+
+        <div style="text-align:center;padding:16px;background:var(--surface2);border-radius:var(--radius)">
+          <div style="font-size:11px;color:var(--muted);letter-spacing:0.1em;margin-bottom:4px">TU 1RM ESTIMADO</div>
+          <div style="font-family:var(--font-display);font-size:34px;color:var(--accent)" x-text="rmEstimado ? rmEstimado + ' kg' : '—'"></div>
+        </div>
+        <p style="font-size:11px;color:var(--muted);margin-top:10px;text-align:center">
+          Estimación basada en la fórmula de Epley. Es una referencia, no un valor exacto.
+        </p>
       </div>
 
       <!-- Calculadora de discos por lado -->
@@ -659,7 +696,13 @@
     // ── Modal de cita de renovación (desde el paywall) ──────────────
     const modalCita = document.getElementById('modal-cita-renovacion');
 
-    document.getElementById('btn-abrir-cita-renovacion').addEventListener('click', () => {
+    document.getElementById('btn-abrir-cita-renovacion').addEventListener('click', async () => {
+      // Pre-llenamos el correo con el de la sesión, ya que el cliente
+      // está logueado (puede editarlo si quiere usar otro).
+      const { data: session } = await sb.auth.getSession();
+      const correoSesion = session?.session?.user?.email ?? '';
+      document.getElementById('cita-renovacion-correo').value = correoSesion;
+
       modalCita.style.display = 'flex';
     });
     document.getElementById('btn-cerrar-cita-renovacion').addEventListener('click', () => {
@@ -668,15 +711,20 @@
 
     document.getElementById('btn-confirmar-cita-renovacion').addEventListener('click', async () => {
       const nombre = document.getElementById('cita-renovacion-nombre').value.trim();
+      const correo = document.getElementById('cita-renovacion-correo').value.trim();
       const fecha  = document.getElementById('cita-renovacion-fecha').value;
+      const hora   = document.getElementById('cita-renovacion-hora').value;
       const errBox = document.getElementById('cita-renovacion-error');
       errBox.style.display = 'none';
 
-      if (!nombre || !fecha) {
-        errBox.textContent = 'Completa tu nombre y la fecha.';
+      if (!nombre || !correo || !fecha || !hora) {
+        errBox.textContent = 'Completa tu nombre, correo, fecha y hora.';
         errBox.style.display = 'block';
         return;
       }
+
+      // Combinamos fecha + hora en un solo valor (ej. "2026-07-01T15:30")
+      const fechaHora = `${fecha}T${hora}:00`;
 
       const { data: session } = await sb.auth.getSession();
       const userId = session?.session?.user?.id ?? null;
@@ -684,7 +732,8 @@
       const { error } = await sb.from('citas').insert({
         tipo: 'renovacion',
         nombre,
-        fecha_cita: fecha,
+        correo,
+        fecha_cita: fechaHora,
         miembro_id: userId
       });
 
@@ -697,6 +746,38 @@
       modalCita.style.display = 'none';
       toast('Cita agendada. Te esperamos ese día en recepción.', 'success');
     });
+
+    // ================================================================
+    // ALPINE.JS — oneRmApp()
+    // Estima el 1RM real (máximo a una repetición) con la fórmula
+    // de Epley: 1RM = peso × (1 + repeticiones / 30)
+    // ================================================================
+    window.oneRmApp = function () {
+      return {
+        pesoLevantado: '',
+        repeticiones: '',
+        rmEstimado: null,
+
+        calcularRM() {
+          const peso = parseFloat(this.pesoLevantado);
+          const reps = parseInt(this.repeticiones);
+
+          if (!peso || !reps || reps < 1) {
+            this.rmEstimado = null;
+            return;
+          }
+
+          // Si solo hizo 1 repetición, ese peso ya ES su 1RM
+          if (reps === 1) {
+            this.rmEstimado = peso;
+            return;
+          }
+
+          const estimado = peso * (1 + reps / 30);
+          this.rmEstimado = Math.round(estimado * 10) / 10;
+        }
+      };
+    };
 
     // ================================================================
     // ALPINE.JS — rmApp()
