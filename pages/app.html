@@ -231,7 +231,11 @@
       color: var(--bg);
     }
     .bar-segment {
-      flex-shrink: 0; height: 10px; width: 36px;
+      flex-shrink: 0; height: 10px; width: 24px;
+      background: var(--surface3);
+    }
+    .bar-segment-center {
+      flex-shrink: 0; height: 10px; width: 44px;
       background: var(--surface3);
     }
     .bar-sleeve {
@@ -468,10 +472,17 @@
         <div class="barbell-wrap">
           <div class="bar-segment"></div>
           <div class="bar-sleeve"></div>
-          <template x-for="(disco, idx) in discosPorLado" :key="idx">
+          <template x-for="(disco, idx) in discosPorLadoInvertido" :key="'l'+idx">
             <div class="plate" :style="'width:' + disco.ancho + 'px;height:' + disco.alto + 'px'" x-text="disco.peso"></div>
           </template>
-          <div class="bar-sleeve" style="margin-left:6px"></div>
+          <div class="bar-sleeve"></div>
+          <div class="bar-segment-center"></div>
+          <div class="bar-sleeve"></div>
+          <template x-for="(disco, idx) in discosPorLado" :key="'r'+idx">
+            <div class="plate" :style="'width:' + disco.ancho + 'px;height:' + disco.alto + 'px'" x-text="disco.peso"></div>
+          </template>
+          <div class="bar-sleeve"></div>
+          <div class="bar-segment"></div>
         </div>
 
         <p id="rm-resultado-txt" x-text="resultadoTexto"></p>
@@ -830,6 +841,12 @@
           } else {
             this.resultadoTexto = `${resultado.length} disco(s) por lado · Total real: ${total}kg`;
           }
+        },
+
+        get discosPorLadoInvertido() {
+          // Mismo set de discos que el lado derecho, pero en orden espejo
+          // para que el disco más grande quede junto al centro de la barra.
+          return [...this.discosPorLado].reverse();
         }
       };
     };
