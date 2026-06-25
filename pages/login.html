@@ -54,22 +54,6 @@
 
     .form-group { display: flex; flex-direction: column; }
 
-    /* Separador "o" entre métodos */
-    .sep {
-      display: flex;
-      align-items: center;
-      gap: 16px;
-      font-size: 12px;
-      color: var(--muted);
-      font-family: var(--font-mono);
-    }
-    .sep::before, .sep::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border);
-    }
-
     /* Error inline */
     #login-error {
       display: none;
@@ -81,23 +65,29 @@
       color: var(--red);
     }
 
-    /* Magic link message */
-    #magic-msg {
-      display: none;
-      padding: 16px;
-      border-radius: var(--radius);
-      background: var(--green-dim);
-      border: 1px solid rgba(0,230,118,0.25);
-      font-size: 13px;
-      color: var(--green);
-      text-align: center;
-      line-height: 1.6;
-    }
-
     .login-footer {
       text-align: center;
       font-size: 12px;
       color: var(--muted);
+    }
+
+    /* ── Modal: agendar cita de inscripción ──────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0; z-index: 300;
+      background: rgba(0,0,0,0.7);
+      align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 28px 24px;
+      max-width: 360px; width: 100%;
+    }
+    @media (max-width: 420px) {
+      .modal-box { padding: 22px 18px; }
     }
   </style>
 </head>
@@ -132,26 +122,41 @@
         <button class="btn btn-primary" type="submit" id="login-btn">
           Entrar →
         </button>
-
-        <div class="sep">ó</div>
-
-        <button class="btn btn-ghost" type="button" id="magic-btn">
-          Enviarme link mágico al correo
-        </button>
-
-        <div id="magic-msg">
-          📬 Revisa tu bandeja de entrada.<br>
-          Te enviamos un enlace de acceso seguro.<br>
-          <span style="color:var(--muted)">Puedes cerrar esta pestaña.</span>
-        </div>
       </form>
     </div>
 
     <div class="login-footer">
       ¿Problemas para acceder? Visita recepción o escríbenos por
-      <a href="https://wa.me/584120361856" target="_blank" style="color:var(--accent)">WhatsApp</a>.
+      <a href="https://wa.me/TU_NUMERO" target="_blank" style="color:var(--accent)">WhatsApp</a>.
     </div>
 
+    <button class="btn btn-ghost" type="button" id="btn-abrir-inscripcion" style="margin-top:8px">
+      ¿Eres nuevo? Inscríbete aquí →
+    </button>
+
+  </div>
+
+  <!-- Modal: agendar cita de inscripción -->
+  <div class="modal-overlay" id="modal-inscripcion">
+    <div class="modal-box">
+      <h3 style="font-family:var(--font-display);font-size:22px;margin-bottom:6px">INSCRIPCIÓN</h3>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:20px">
+        Indícanos tu nombre y el día que vendrás a inscribirte, para que recepción te esté esperando.
+      </p>
+      <div style="display:flex;flex-direction:column;gap:14px">
+        <div class="form-group">
+          <label class="form-label">Tu nombre</label>
+          <input class="form-input" type="text" id="inscripcion-nombre" placeholder="Nombre completo"/>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Fecha en la que vendrás</label>
+          <input class="form-input" type="date" id="inscripcion-fecha"/>
+        </div>
+        <p id="inscripcion-error" style="display:none;color:var(--red);font-size:12px"></p>
+        <button class="btn btn-primary" id="btn-confirmar-inscripcion">Confirmar cita</button>
+        <button class="btn btn-ghost btn-sm" id="btn-cerrar-inscripcion">Cancelar</button>
+      </div>
+    </div>
   </div>
 
   <script type="module">
@@ -160,9 +165,7 @@
     const sb        = getClient();
     const form      = document.getElementById('login-form');
     const loginBtn  = document.getElementById('login-btn');
-    const magicBtn  = document.getElementById('magic-btn');
     const errorBox  = document.getElementById('login-error');
-    const magicMsg  = document.getElementById('magic-msg');
 
     // ── Helpers de UI ───────────────────────────────────────────
     function showError(msg) {
@@ -177,7 +180,6 @@
     }
 
     loginBtn.dataset.label = 'Entrar →';
-    magicBtn.dataset.label = 'Enviarme link mágico al correo';
 
     // ── Redirigir si ya hay sesión activa ───────────────────────
     sb.auth.getSession().then(({ data: { session } }) => {
@@ -205,28 +207,45 @@
       window.location.href = 'app.html';
     });
 
-    // ── Magic Link (sin contraseña) ─────────────────────────────
-    magicBtn.addEventListener('click', async () => {
-      const email = document.getElementById('email').value.trim();
-      if (!email) { showError('Escribe tu correo primero.'); return; }
+    // ── Modal: agendar cita de inscripción ──────────────────────
+    const modalInscripcion = document.getElementById('modal-inscripcion');
 
-      clearError();
-      setLoading(magicBtn, true);
+    document.getElementById('btn-abrir-inscripcion').addEventListener('click', () => {
+      modalInscripcion.style.display = 'flex';
+    });
+    document.getElementById('btn-cerrar-inscripcion').addEventListener('click', () => {
+      modalInscripcion.style.display = 'none';
+    });
 
-      const { error } = await sb.auth.signInWithOtp({
-        email,
-        options: { emailRedirectTo: window.location.origin + '/pages/app.html' }
-      });
+    document.getElementById('btn-confirmar-inscripcion').addEventListener('click', async () => {
+      const nombre = document.getElementById('inscripcion-nombre').value.trim();
+      const fecha  = document.getElementById('inscripcion-fecha').value;
+      const errBox = document.getElementById('inscripcion-error');
+      errBox.style.display = 'none';
 
-      setLoading(magicBtn, false);
-
-      if (error) {
-        showError('No se pudo enviar el link. Verifica el correo e intenta de nuevo.');
+      if (!nombre || !fecha) {
+        errBox.textContent = 'Completa tu nombre y la fecha.';
+        errBox.style.display = 'block';
         return;
       }
 
-      magicMsg.style.display = 'block';
-      magicBtn.style.display = 'none';
+      // No requiere sesión: cualquiera puede agendar su cita de
+      // inscripción (política RLS "cualquiera_puede_agendar_cita").
+      const { error } = await sb.from('citas').insert({
+        tipo: 'inscripcion',
+        nombre,
+        fecha_cita: fecha,
+        miembro_id: null
+      });
+
+      if (error) {
+        errBox.textContent = 'No se pudo agendar: ' + error.message;
+        errBox.style.display = 'block';
+        return;
+      }
+
+      modalInscripcion.style.display = 'none';
+      toast('Cita agendada. Te esperamos ese día en recepción.', 'success');
     });
   </script>
 </body>
