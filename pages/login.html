@@ -141,7 +141,7 @@
     <div class="modal-box">
       <h3 style="font-family:var(--font-display);font-size:22px;margin-bottom:6px">INSCRIPCIÓN</h3>
       <p style="font-size:13px;color:var(--muted);margin-bottom:20px">
-        Indícanos tu nombre y el día que vendrás a inscribirte, para que recepción te esté esperando.
+        Indícanos tu nombre, día y hora en la que vendrás a inscribirte, para que recepción te esté esperando.
       </p>
       <div style="display:flex;flex-direction:column;gap:14px">
         <div class="form-group">
@@ -149,8 +149,18 @@
           <input class="form-input" type="text" id="inscripcion-nombre" placeholder="Nombre completo"/>
         </div>
         <div class="form-group">
-          <label class="form-label">Fecha en la que vendrás</label>
-          <input class="form-input" type="date" id="inscripcion-fecha"/>
+          <label class="form-label">Tu correo</label>
+          <input class="form-input" type="email" id="inscripcion-correo" placeholder="tu@correo.com"/>
+        </div>
+        <div style="display:flex;gap:10px">
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Fecha</label>
+            <input class="form-input" type="date" id="inscripcion-fecha"/>
+          </div>
+          <div class="form-group" style="flex:1">
+            <label class="form-label">Hora</label>
+            <input class="form-input" type="time" id="inscripcion-hora"/>
+          </div>
         </div>
         <p id="inscripcion-error" style="display:none;color:var(--red);font-size:12px"></p>
         <button class="btn btn-primary" id="btn-confirmar-inscripcion">Confirmar cita</button>
@@ -219,22 +229,28 @@
 
     document.getElementById('btn-confirmar-inscripcion').addEventListener('click', async () => {
       const nombre = document.getElementById('inscripcion-nombre').value.trim();
+      const correo = document.getElementById('inscripcion-correo').value.trim();
       const fecha  = document.getElementById('inscripcion-fecha').value;
+      const hora   = document.getElementById('inscripcion-hora').value;
       const errBox = document.getElementById('inscripcion-error');
       errBox.style.display = 'none';
 
-      if (!nombre || !fecha) {
-        errBox.textContent = 'Completa tu nombre y la fecha.';
+      if (!nombre || !correo || !fecha || !hora) {
+        errBox.textContent = 'Completa tu nombre, correo, fecha y hora.';
         errBox.style.display = 'block';
         return;
       }
+
+      // Combinamos fecha + hora en un solo valor (ej. "2026-07-01T15:30")
+      const fechaHora = `${fecha}T${hora}:00`;
 
       // No requiere sesión: cualquiera puede agendar su cita de
       // inscripción (política RLS "cualquiera_puede_agendar_cita").
       const { error } = await sb.from('citas').insert({
         tipo: 'inscripcion',
         nombre,
-        fecha_cita: fecha,
+        correo,
+        fecha_cita: fechaHora,
         miembro_id: null
       });
 
