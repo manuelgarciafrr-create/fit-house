@@ -332,6 +332,7 @@
               <span style="font-size:18px" x-text="c.tipo === 'inscripcion' ? '🆕' : '🔄'"></span>
               <div style="flex:1">
                 <div style="font-size:14px;font-weight:600" x-text="c.nombre"></div>
+                <div style="font-size:12px;color:var(--muted)" x-text="c.correo"></div>
                 <div style="font-size:12px;color:var(--muted)">
                   <span x-text="c.tipo === 'inscripcion' ? 'Inscripción' : 'Renovación'"></span>
                   · <span x-text="formatFecha(c.fecha_cita)"></span>
@@ -769,8 +770,14 @@
         },
 
         formatFecha(fechaStr) {
-          const [year, month, day] = fechaStr.split('-');
-          return `${day}/${month}/${year}`;
+          // fechaStr llega como timestamp, ej: "2026-07-01T15:30:00"
+          const fecha = new Date(fechaStr);
+          const dia    = String(fecha.getDate()).padStart(2, '0');
+          const mes    = String(fecha.getMonth() + 1).padStart(2, '0');
+          const anio   = fecha.getFullYear();
+          const horas  = String(fecha.getHours()).padStart(2, '0');
+          const mins   = String(fecha.getMinutes()).padStart(2, '0');
+          return `${dia}/${mes}/${anio} · ${horas}:${mins}`;
         }
       };
     };
